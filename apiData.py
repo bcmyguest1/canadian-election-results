@@ -3,6 +3,7 @@ import requests
 import psycopg2 
 import time
 import sys
+from io import StringIO
 election = 'federal2019'#default value --> note: the database is 
 
 # Set of functionalized api calls for easier access if needed
@@ -47,7 +48,6 @@ def fillCandidateAndVoterInfo(candidate,partiesDict,tmpVoterShare,tmpRidingCandi
         # fill in the candidate and roster in the same loop
         # table design kind of forces hard coding here
         candName = tmpRidingCandidate.makeCandidateName(candidate['First'],candidate['Last'])
-        voteShare = tmpVoterShare.determineVoteShare(candidate['Votes'],candidate['TotalVoters'])
         print('Adding candidate: {} with VS: {} for party: {}'.format(candName,voteShare,candidate[partyShortNameEn]))
         if candidate[partyShortNameEn] == 'LIB':
             tmpRidingCandidate.libCand = candName 
@@ -125,6 +125,10 @@ class ridingCandidates:
         self.PPCCand = PPCCand
     def makeCandidateName(self, fname, lname):
         return '{} {}'.format(fname,lname)
+    def createDbInsertString(self):
+        cols = (self.ridingNumber,self.libCand,self.conCand,self.NDPCand,
+                self.GreCand, self.BQCand, self.PPCCand)
+        return ('\t'.join(map(str,cols)) + '\n')
 
 class ridingVotes:
     # needs info from the parties, ridings api, candidates riding api
@@ -141,12 +145,37 @@ class ridingVotes:
         self.NDPVS = NDPVS
         self.GreVS = GreVS
         self.PPCVS = PPCVS
-    def determineVoteShare(self, votes, voters):
+    def determineVoteShare(self, votes=-1, voters=-1):
+        if (votes < 0 or voters < 0):
+            return self.totalVotes/self.totalVoters
         return votes/voters
+    def createDbInsertString(self):
+        cols = (self.ridingNumber,self.ridingNameEn,self.ridingNameFr,
+                self.totalVotes, self.determineVoteShare(),self.libVS,
+                self.conVS, self.NDPVS, self.BQVS, self.GreVS, self.PPCVS)
+        return ('\t'.join(map(str,cols)) + '\n')
+
+def copyToDB(cur, dbName, items, colNames):
+    try:
+        f = StringIO()
+        f.writelines(items)
+        f.seek(0)
+        cur.copy_from(f,dbName,columns=colNames)
+        return True
+    except:
+        print('could not write to: {}'.format(dbName))
+        return False
 
 
 try :
 
+        host="server",
+        database = "dbname",
+        user = "uname",
+        password="pword",
+        port=5432
+    )
+    cur = conn.cursor()
 
     print('Getting riding votes and candidates')
     databaseWrite = True
@@ -161,6 +190,35 @@ try :
         and len(candidateVotesDict) > 0):
         if databaseWrite:
             print('Adding to db')
+            # copy formatted string for faster writes, alternative is to use executemany
+            
+            # vote_shares add
+            
+            items = []
+            for ridingVotes in ridingsVotesDict:
+                items.append(ridingsVotesDict[ridingVotes].createDbInsertString())  
+            colNames = ('"RidingNumber"','"RidingNameEn"','"RidingNameFr"','"TotalVotes"',
+                        '"Turnout"','"LibVoteShare"','"ConVoteShare"','"NDPVoteShare"',
+                        '"BQVoteShare"','"GreenVoteShare"','"PPCVoteShare"')
+            dbName = 'vote_share'
+            print('Adding to {}'.format(dbName))
+            with conn.cursor() as cur:
+                copyToDB(cur, dbName, items, colNames)
+            print('Added to {}'.format(dbName))
+
+            # candidates add
+            items = []
+            for candidates in candidateVotesDict:
+                items.append(candidateVotesDict[candidates].createDbInsertString())
+            colNames = ('"RidingNumber"','"LibCandidate"','"ConCandidate"',
+                        '"NDPCandidate"','"GreenCandidate"','"BQCandidate"',
+                        '"PPCCandidate"')
+            dbName = 'candidates'
+            print('Adding to {}'.format(dbName))
+            with conn.cursor() as cur:
+                copyToDB(cur,dbName,items,colNames)
+            print('Added to {}'.format(dbName))
+            conn.commit()
         else:
             print('ridings:')
             print(ridingsVotesDict)
@@ -170,4 +228,8 @@ try :
     else:
         print('There are no items in one of the dicts! Not adding to sql')
 except (Exception, psycopg2.DatabaseError) as e:
+    try:
+        conn.rollback()
+    except:
+        print('could not rollback')
     print(e)
