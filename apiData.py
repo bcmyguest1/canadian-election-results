@@ -155,6 +155,11 @@ class ridingVotes:
                 self.conVS, self.NDPVS, self.BQVS, self.GreVS, self.PPCVS)
         return ('\t'.join(map(str,cols)) + '\n')
 
+# decision to do this means that we can only make a single write to the db. 
+# Probably not a good idea unless we are using this only once to load data. 
+# Otherwise, we should use another function
+# alternative is to do something like https://www.psycopg.org/docs/extras.html#psycopg2.extras.execute_values
+# would be a safer alternative
 def copyToDB(cur, dbName, items, colNames):
     try:
         f = StringIO()
