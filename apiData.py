@@ -2,8 +2,8 @@
 import requests 
 import psycopg2 
 import time
-
-election = 'federal2019'
+import sys
+election = 'federal2019'#default value --> note: the database is 
 
 # Set of functionalized api calls for easier access if needed
 def getApiStatus(election):
@@ -41,28 +41,30 @@ def buildURI(election, endpoint):
     return uri
 
 def fillCandidateAndVoterInfo(candidate,partiesDict,tmpVoterShare,tmpRidingCandidate):
-    if candidate['PartyShortName_En'] in partiesDict:
+    partyShortNameEn = 'PartyShortName_En'
+    if candidate[partyShortNameEn] in partiesDict:
+        party = partiesDict[candidate[partyShortNameEn]]
         # fill in the candidate and roster in the same loop
         # table design kind of forces hard coding here
         candName = tmpRidingCandidate.makeCandidateName(candidate['First'],candidate['Last'])
         voteShare = tmpVoterShare.determineVoteShare(candidate['Votes'],candidate['TotalVoters'])
-        print('Adding candidate: {} with VS: {} for party: {}'.format(candName,voteShare,candidate['PartyShortName_En']))
-        if candidate['PartyShortName_En'] == 'LIB':
+        print('Adding candidate: {} with VS: {} for party: {}'.format(candName,voteShare,candidate[partyShortNameEn]))
+        if candidate[partyShortNameEn] == 'LIB':
             tmpRidingCandidate.libCand = candName 
             tmpVoterShare.libVS = voteShare
-        elif candidate['PartyShortName_En'] == 'CON':
+        elif candidate[partyShortNameEn] == 'CON':
             tmpRidingCandidate.conCand = candName
             tmpVoterShare.conVS = voteShare
-        elif candidate['PartyShortName_En'] == 'NDP':
+        elif candidate[partyShortNameEn] == 'NDP':
             tmpRidingCandidate.NDPCand = candName
             tmpVoterShare.NDPVS = voteShare
-        elif candidate['PartyShortName_En'] == 'BQ':
+        elif candidate[partyShortNameEn] == 'BQ':
             tmpRidingCandidate.BQCand = candName
             tmpVoterShare.BQVS = voteShare
-        elif candidate['PartyShortName_En'] == 'PPC':
+        elif candidate[partyShortNameEn] == 'PPC':
             tmpRidingCandidate.PPCCand = candName
             tmpVoterShare.PPCVS = voteShare
-        elif candidate['PartyShortName_En'] == 'GR':
+        elif candidate[partyShortNameEn] == 'GRN':
             tmpRidingCandidate.GreCand = candName
             tmpVoterShare.GreVS = voteShare
     return tmpVoterShare, tmpRidingCandidate
@@ -80,7 +82,11 @@ def getAndFormatAPIInfo(election):
         ridingsVotesDict = {}
         candidateVotesDict = {}
         for tmpRiding in ridingsAPI:
-            ridingsVotesDict[tmpRiding['RidingNumber']] = ridingVotes(tmpRiding['RidingNumber'], tmpRiding['TotalVotes'], tmpRiding['TotalVoters'])
+            ridingsVotesDict[tmpRiding['RidingNumber']] = ridingVotes(tmpRiding['RidingNumber'], 
+                                                                    tmpRiding['TotalVotes'], 
+                                                                    tmpRiding['TotalVoters'],
+                                                                    tmpRiding['Name_En'],
+                                                                    tmpRiding['Name_Fr'])
         # for each of these ridings, we will need to make an api request which can be used to both get candidate and more vote info
         # simpler to have this in a separate for loop, time complexity is the same
         if ridingsVotesDict is not None:
@@ -127,7 +133,7 @@ class ridingVotes:
         self.ridingNumber = number
         self.ridingNameEn = nameEn
         self.ridingNameFr = nameFr
-        self.totalVoters = votes
+        self.totalVotes = votes
         self.totalVoters = voters
         self.conVS = conVS
         self.libVS = libVS
@@ -143,12 +149,24 @@ try :
 
 
     print('Getting riding votes and candidates')
+    databaseWrite = True
+    if (len(sys.argv) > 1):
+        election = sys.argv[1]
+        databaseWrite = False
+        print('Not writting to db')
     ridingsVotesDict, candidateVotesDict = getAndFormatAPIInfo(election)
     if (ridingsVotesDict is not None 
         and len(ridingsVotesDict) > 0 
         and candidateVotesDict is not None 
         and len(candidateVotesDict) > 0):
-        print('Adding to sql')
+        if databaseWrite:
+            print('Adding to db')
+        else:
+            print('ridings:')
+            print(ridingsVotesDict)
+            print('candidates')
+            print(candidateVotesDict)
+        
     else:
         print('There are no items in one of the dicts! Not adding to sql')
 except (Exception, psycopg2.DatabaseError) as e:
