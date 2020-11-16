@@ -1,3 +1,7 @@
+Run Instructions:
+    python version: 3+
+    install requirements: pip3 install -r requirements.txt
+    run: python.exe apiData.py
 
 Task 1
 
