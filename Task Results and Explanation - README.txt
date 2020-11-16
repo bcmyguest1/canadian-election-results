@@ -106,6 +106,8 @@ Note: no need for having clause here, but in theory we could use it to filter
 
 Answer: 3, Green Party
 
+
+To be clear, I am not certain I got everything exactly correct/optimized (this was my first time using postgres, previously I have used MySQL and sqlite3 which are usually a little more hands off/lenient), so obviously take my feedback with a grain of salt.
 Feedback on Test:
 -make it clear what you are looking for: this is a small dataset, so optimization of inserts is not really relevant, but would absolutely be for larger datasets
 -allow creativity in table design: giving us the table design (minus indexes) doesn't really allow people to show their sql skill, especially because indexes can often depend on the queries we want to run. Instead I would suggest giving the data we need to model, but allow creativity in the table design and columns. Also judge for column/table names and proper design. Scope is very limited (but that is probably intentional, I do understand that)
@@ -113,7 +115,6 @@ Feedback on Test:
 -Enforce a time limit (forced table design): this could give some insight into initial thought process
 -Overall it is a good test for basic python knowledge and contructing custom sql queries on data
 
-To be clear, I am not certain I got everything exactly correct/optimized, so obviously take my feedback with a grain of salt.
 
 Aside - Table design could also be something like (I didn't model this in an ER diagram, so there might be some issues, but this is the general concept):
 
